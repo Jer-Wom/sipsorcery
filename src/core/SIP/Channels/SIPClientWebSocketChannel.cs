@@ -178,6 +178,7 @@ namespace SIPSorcery.SIP
                 {
                     // Attempt a new connection.
                     ClientWebSocket clientWebSocket = new ClientWebSocket();
+                    clientWebSocket.Options.AddSubProtocol(SIP_Sec_WebSocket_Protocol);
                     await clientWebSocket.ConnectAsync(serverUri, m_cts.Token).ConfigureAwait(false);
 
                     logger.LogDebug($"Successfully connected web socket client to {serverUri}.");
