@@ -127,7 +127,7 @@ namespace SIPSorcery.SIP
                 throw new ArgumentException("buffer", "The buffer must be set and non empty for Send in SIPClientWebSocketChannel.");
             }
 
-            return SendAsync(dstEndPoint, buffer);
+            return SendSecureAsync(dstEndPoint, buffer, null);
         }
 
         /// <summary>
@@ -144,7 +144,7 @@ namespace SIPSorcery.SIP
                 throw new ArgumentException("buffer", "The buffer must be set and non empty for SendSecure in SIPClientWebSocketChannel.");
             }
 
-            return SendAsync(dstEndPoint, buffer);
+            return SendSecureAsync(dstEndPoint, buffer, serverCertificateName);
         }
 
         /// <summary>
@@ -153,8 +153,10 @@ namespace SIPSorcery.SIP
         /// </summary>
         /// <param name="serverEndPoint">The remote web socket server URI to send to.</param>
         /// <param name="buffer">The data buffer to send.</param>
+        /// <param name="serverCertificateName">Optional. Only relevant for WSS streams. The common name
+        /// that is expected for the remote SSL server.</param>
         /// <returns>A success value or an error for failure.</returns>
-        private async Task<SocketError> SendAsync(SIPEndPoint serverEndPoint, byte[] buffer)
+        private async Task<SocketError> SendSecureAsync(SIPEndPoint serverEndPoint, byte[] buffer, string serverCertificateName )
         {
             try
             {
@@ -176,6 +178,13 @@ namespace SIPSorcery.SIP
                 }
                 else
                 {
+                    // Change serverUri with certificate domain name to allow ClientWebSocket to verify the certificate. 
+                    // This is done here to allow ConnectionID computation based on IPAddress
+                    if ( !string.IsNullOrWhiteSpace(serverCertificateName) )
+                    {
+                        serverUri = new Uri($"{uriPrefix}{serverCertificateName}:{serverEndPoint.Port}");
+                    }
+
                     // Attempt a new connection.
                     ClientWebSocket clientWebSocket = new ClientWebSocket();
                     clientWebSocket.Options.AddSubProtocol(SIP_Sec_WebSocket_Protocol);

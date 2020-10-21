@@ -526,7 +526,7 @@ namespace SIPSorcery.SIP
 
             SIPRequestOutTraceEvent?.Invoke(sendFromSIPEndPoint, dstEndPoint, sipRequest);
 
-            if (sipChannel.IsSecure)
+            if (sipChannel.IsSecure || ( sipChannel.GetType() == typeof(SIPClientWebSocketChannel) && sipRequest.URI.Protocol == SIPProtocolsEnum.wss ) )
             {
                 return sipChannel.SendSecureAsync(dstEndPoint, Encoding.UTF8.GetBytes(sipRequest.ToString()), sipRequest.URI.Host, sipRequest.SendFromHintConnectionID);
             }
