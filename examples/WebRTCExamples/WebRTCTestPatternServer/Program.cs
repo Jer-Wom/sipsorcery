@@ -29,6 +29,7 @@ using WebSocketSharp.Server;
 using SIPSorcery.Media;
 using SIPSorceryMedia.Abstractions.V1;
 using Serilog.Extensions.Logging;
+using System.Security.Cryptography.X509Certificates;
 
 namespace demo
 {
@@ -60,12 +61,23 @@ namespace demo
             var parseResult = Parser.Default.ParseArguments<Options>(args);
             var options = (parseResult as Parsed<Options>)?.Value;
 
+            //X509Certificate2 cert = new X509Certificate2("localhost.pfx", "", X509KeyStorageFlags.Exportable);
+            //if (cert == null)
+            //{
+            //    Console.WriteLine("Could not load certificate file.");
+            //}
+            //else
+            //{
+            //    Console.WriteLine($"Certificate file successfully loaded {cert.Thumbprint}, have private key {cert.HasPrivateKey}.");
+            //}
+            X509Certificate2 cert = null;
+
             if (options?.NodeDssServer == null)
             {
                 // Start web socket.
                 Console.WriteLine("Starting web socket server...");
                 var webSocketServer = new WebSocketServer(IPAddress.Any, WEBSOCKET_PORT);
-                webSocketServer.AddWebSocketService<WebRTCWebSocketPeer>("/", (peer) => peer.CreatePeerConnection = CreatePeerConnection);
+                webSocketServer.AddWebSocketService<WebRTCWebSocketPeer>("/", (peer) => peer.CreatePeerConnection = () => CreatePeerConnection(cert));
                 webSocketServer.Start();
 
                 Console.WriteLine($"Waiting for web socket connections on {webSocketServer.Address}:{webSocketServer.Port}...");
@@ -81,7 +93,7 @@ namespace demo
 
                 Console.WriteLine($"Sending offer to node dss server at {fields[0]}, our ID={fields[1]}, their ID={fields[2]}.");
 
-                var nodeDssPeer = new WebRTCNodeDssPeer(fields[0], fields[1], fields[2], CreatePeerConnection);
+                var nodeDssPeer = new WebRTCNodeDssPeer(fields[0], fields[1], fields[2], () => CreatePeerConnection(cert));
                 await nodeDssPeer.Start(cts);
 
                 Console.WriteLine($"Waiting for node DSS peer to connect...");
@@ -101,18 +113,19 @@ namespace demo
             exitMre.WaitOne();
         }
 
-        private static Task<RTCPeerConnection> CreatePeerConnection()
+        private static Task<RTCPeerConnection> CreatePeerConnection(X509Certificate2 cert)
         {
-            RTCConfiguration config = new RTCConfiguration
-            {
-                iceServers = new List<RTCIceServer> { new RTCIceServer { urls = STUN_URL } }
-            };
+            //RTCConfiguration config = new RTCConfiguration
+            //{
+            //    iceServers = new List<RTCIceServer> { new RTCIceServer { urls = STUN_URL } },
+            //    certificates = new List<RTCCertificate> { new RTCCertificate { Certificate = cert } }
+            //};
             //var pc = new RTCPeerConnection(config);
             var pc = new RTCPeerConnection(null);
 
             var testPatternSource = new VideoTestPatternSource();
-            //testPatternSource.SetFrameRate(60);
-            testPatternSource.SetMaxFrameRate(true);
+            testPatternSource.SetFrameRate(60);
+            //testPatternSource.SetMaxFrameRate(true);
             var videoEndPoint = new SIPSorceryMedia.FFmpeg.FFmpegVideoEndPoint();
             videoEndPoint.RestrictFormats(format => format.Codec == VideoCodecsEnum.H264);
             //var videoEndPoint = new SIPSorceryMedia.Windows.WindowsVideoEndPoint(true);
@@ -139,6 +152,7 @@ namespace demo
                 {
                     await testPatternSource.CloseVideo();
                     await videoEndPoint.CloseVideo();
+                    videoEndPoint.Dispose();
                 }
                 else if (state == RTCPeerConnectionState.connected)
                 {
