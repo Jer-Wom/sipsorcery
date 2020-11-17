@@ -124,10 +124,9 @@ namespace SIPSorcery.Net
         public List<SDPApplicationMediaFormat> ApplicationMediaFormats = new List<SDPApplicationMediaFormat>(); // List of media formats for "application media announcements.
 
         /// <summary>
-        /// The stream status of this media announcement. Note that None means no explicit value has been set
-        /// and unless there is a session level value then the implicit default is sendrecv.
+        /// The stream status of this media announcement. If no value is explicitly set then the default is sendrecv.
         /// </summary>
-        public MediaStreamStatusEnum MediaStreamStatus { get; set; } = MediaStreamStatusEnum.None;
+        public MediaStreamStatusEnum MediaStreamStatus { get; set; } = MediaStreamStatusEnum.SendRecv;
 
         public SDPMediaAnnouncement()
         { }
@@ -178,11 +177,12 @@ namespace SIPSorcery.Net
                         }
                         else
                         {
-                            if (Int32.TryParse(formatID, out int id) 
-                                && !MediaFormats.ContainsKey(id) 
+                            if (Int32.TryParse(formatID, out int id)
+                                && !MediaFormats.ContainsKey(id)
                                 && id < SDPAudioVideoMediaFormat.DYNAMIC_ID_MIN)
                             {
-                                if (Enum.TryParse<SDPWellKnownMediaFormatsEnum>(formatID, out var wellKnown))
+                                if (Enum.IsDefined(typeof(SDPWellKnownMediaFormatsEnum), id) &&
+                                    Enum.TryParse<SDPWellKnownMediaFormatsEnum>(formatID, out var wellKnown))
                                 {
                                     MediaFormats.Add(id, new SDPAudioVideoMediaFormat(wellKnown));
                                 }
@@ -243,10 +243,7 @@ namespace SIPSorcery.Net
                 announcement += desc.ToString() + m_CRLF;
             }
 
-            if (MediaStreamStatus != MediaStreamStatusEnum.None)
-            {
-                announcement += MediaStreamStatusType.GetAttributeForMediaStreamStatus(MediaStreamStatus) + m_CRLF;
-            }
+            announcement += MediaStreamStatusType.GetAttributeForMediaStreamStatus(MediaStreamStatus) + m_CRLF;
 
             if (SsrcGroupID != null && SsrcAttributes.Count > 0)
             {
@@ -301,7 +298,7 @@ namespace SIPSorcery.Net
             if (Media == SDPMediaTypesEnum.application)
             {
                 StringBuilder sb = new StringBuilder();
-                foreach(SDPApplicationMediaFormat appFormat in ApplicationMediaFormats)
+                foreach (SDPApplicationMediaFormat appFormat in ApplicationMediaFormats)
                 {
                     sb.Append(appFormat.ID);
                     sb.Append(" ");
@@ -331,7 +328,7 @@ namespace SIPSorcery.Net
                     foreach (SDPApplicationMediaFormat appFormat in ApplicationMediaFormats.Where(x => x.Rtpmap != null))
                     {
                         sb.Append($"{SDPMediaAnnouncement.MEDIA_FORMAT_ATTRIBUE_PREFIX}{appFormat.ID} {appFormat.Rtpmap}{m_CRLF}");
-                        if(appFormat.Fmtmp != null)
+                        if (appFormat.Fmtmp != null)
                         {
                             sb.Append($"{SDPMediaAnnouncement.MEDIA_FORMAT_PARAMETERS_ATTRIBUE_PREFIX}{appFormat.ID} {appFormat.Fmtmp}{m_CRLF}");
                         }
@@ -350,9 +347,19 @@ namespace SIPSorcery.Net
 
                 if (MediaFormats != null)
                 {
-                    foreach (var mediaFormat in MediaFormats.Where(x => x.Key >= SDPAudioVideoMediaFormat.DYNAMIC_ID_MIN).Select(y => y.Value))
+                    //foreach (var mediaFormat in MediaFormats.Where(x => x.Key >= SDPAudioVideoMediaFormat.DYNAMIC_ID_MIN).Select(y => y.Value))
+                    foreach (var mediaFormat in MediaFormats.Select(y => y.Value))
                     {
-                        formatAttributes += SDPMediaAnnouncement.MEDIA_FORMAT_ATTRIBUE_PREFIX + mediaFormat.ID + " " + mediaFormat.Rtpmap + m_CRLF;
+                        if (mediaFormat.Rtpmap == null)
+                        {
+                            // Well known media formats are not required to add an rtpmap but we do so any way as some SIP
+                            // stacks don't work without it.
+                            formatAttributes += SDPMediaAnnouncement.MEDIA_FORMAT_ATTRIBUE_PREFIX + mediaFormat.ID + " " + mediaFormat.Name() + "/" + mediaFormat.ClockRate() + m_CRLF;
+                        }
+                        else
+                        {
+                            formatAttributes += SDPMediaAnnouncement.MEDIA_FORMAT_ATTRIBUE_PREFIX + mediaFormat.ID + " " + mediaFormat.Rtpmap + m_CRLF;
+                        }
 
                         if (mediaFormat.Fmtp != null)
                         {

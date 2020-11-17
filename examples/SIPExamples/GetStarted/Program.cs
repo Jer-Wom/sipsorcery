@@ -31,9 +31,9 @@ namespace demo
 {
     class Program
     {
-        private static string DESTINATION = "time@sipsorcery.com";
-        //private static string DESTINATION = "sip:*61@192.168.0.48";
-        private static SIPEndPoint OUTBOUND_PROXY = null; // SIPEndPoint.ParseSIPEndPoint("udp:192.168.0.148:5060");
+        //private static string DESTINATION = "time@sipsorcery.com";
+        private static string DESTINATION = "sip:aaron@192.168.0.50:6060";
+        private static SIPEndPoint OUTBOUND_PROXY = null;// SIPEndPoint.ParseSIPEndPoint("udp:192.168.0.147:5060");
 
         static async Task Main()
         {
@@ -53,7 +53,7 @@ namespace demo
             var windowsAudio = new WindowsAudioEndPoint(new AudioEncoder());
             var voipMediaSession = new VoIPMediaSession(windowsAudio.ToMediaEndPoints());
             voipMediaSession.AcceptRtpFromAny = true;
-            
+
             // Place the call and wait for the result.
             var callTask = userAgent.Call(DESTINATION, null, null, voipMediaSession);
 

@@ -987,6 +987,11 @@ namespace SIPSorcery.SIP.App
                     OnTransferNotify?.Invoke(sipRequest.Body);
                 }
             }
+            else if (m_isTransportExclusive)
+            {
+                SIPResponse notSupportedResponse = SIPResponse.GetResponse(sipRequest, SIPResponseStatusCodesEnum.NotImplemented, null);
+                await m_transport.SendResponseAsync(notSupportedResponse).ConfigureAwait(false);
+            }
         }
 
         /// <summary>
@@ -1602,7 +1607,7 @@ namespace SIPSorcery.SIP.App
 
             if (IsOnLocalHold && IsOnRemoteHold)
             {
-                streamStatus = MediaStreamStatusEnum.None;
+                streamStatus = MediaStreamStatusEnum.Inactive;
             }
             else if (!IsOnLocalHold && !IsOnRemoteHold)
             {

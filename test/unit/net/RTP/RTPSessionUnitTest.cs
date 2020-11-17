@@ -161,7 +161,7 @@ namespace SIPSorcery.Net.UnitTests
 
             RTPSession remoteSession = new RTPSession(false, false, false);
             // The track for the track for the remote session is still local relative to the session it's being added to.
-            MediaStreamTrack remoteVideoTrack = new MediaStreamTrack(SDPMediaTypesEnum.video, false, new List<SDPAudioVideoMediaFormat> { new SDPAudioVideoMediaFormat(96, "VP8", 90000) });
+            MediaStreamTrack remoteVideoTrack = new MediaStreamTrack(SDPMediaTypesEnum.video, false, new List<SDPAudioVideoMediaFormat> { new SDPAudioVideoMediaFormat(SDPMediaTypesEnum.video, 96, "VP8", 90000) });
             remoteSession.addTrack(remoteVideoTrack);
 
             var result = localSession.SetRemoteDescription(SIP.App.SdpType.offer, remoteSession.CreateOffer(IPAddress.Loopback));
@@ -288,7 +288,7 @@ namespace SIPSorcery.Net.UnitTests
             // The track for the track for the remote session is still local relative to the session it's being added to.
             MediaStreamTrack remoteAudioTrack = new MediaStreamTrack(SDPMediaTypesEnum.audio, false, new List<SDPAudioVideoMediaFormat> { new SDPAudioVideoMediaFormat(SDPWellKnownMediaFormatsEnum.PCMU) });
             remoteSession.addTrack(remoteAudioTrack);
-            MediaStreamTrack remoteVideoTrack = new MediaStreamTrack(SDPMediaTypesEnum.video, false, new List<SDPAudioVideoMediaFormat> { new SDPAudioVideoMediaFormat(96, "VP8", 90000) });
+            MediaStreamTrack remoteVideoTrack = new MediaStreamTrack(SDPMediaTypesEnum.video, false, new List<SDPAudioVideoMediaFormat> { new SDPAudioVideoMediaFormat(SDPMediaTypesEnum.video, 96, "VP8", 90000) });
             remoteSession.addTrack(remoteVideoTrack);
 
             var offer = remoteSession.CreateOffer(IPAddress.Loopback);
@@ -324,7 +324,7 @@ namespace SIPSorcery.Net.UnitTests
 
             // A local session is created but only has a video track added to it.
             RTPSession localSession = new RTPSession(false, false, false);
-            MediaStreamTrack localVideoTrack = new MediaStreamTrack(SDPMediaTypesEnum.video, false, new List<SDPAudioVideoMediaFormat> { new SDPAudioVideoMediaFormat(96, "VP8", 90000) });
+            MediaStreamTrack localVideoTrack = new MediaStreamTrack(SDPMediaTypesEnum.video, false, new List<SDPAudioVideoMediaFormat> { new SDPAudioVideoMediaFormat(SDPMediaTypesEnum.video, 96, "VP8", 90000) });
             localSession.addTrack(localVideoTrack);
 
             // Create a remote session with both audio and video tracks.
@@ -332,7 +332,7 @@ namespace SIPSorcery.Net.UnitTests
             // The track for the track for the remote session is still local relative to the session it's being added to.
             MediaStreamTrack remoteAudioTrack = new MediaStreamTrack(SDPMediaTypesEnum.audio, false, new List<SDPAudioVideoMediaFormat> { new SDPAudioVideoMediaFormat(SDPWellKnownMediaFormatsEnum.PCMU) });
             remoteSession.addTrack(remoteAudioTrack);
-            MediaStreamTrack remoteVideoTrack = new MediaStreamTrack(SDPMediaTypesEnum.video, false, new List<SDPAudioVideoMediaFormat> { new SDPAudioVideoMediaFormat(96, "VP8", 90000) });
+            MediaStreamTrack remoteVideoTrack = new MediaStreamTrack(SDPMediaTypesEnum.video, false, new List<SDPAudioVideoMediaFormat> { new SDPAudioVideoMediaFormat(SDPMediaTypesEnum.video, 96, "VP8", 90000) });
             remoteSession.addTrack(remoteVideoTrack);
 
             var offer = remoteSession.CreateOffer(IPAddress.Loopback);
@@ -403,35 +403,175 @@ t=0 0
 m=video 60638 RTP/AVP 100
 a=rtpmap:100 VP8/90000
 a=sendrecv
-m=audio 60640 RTP/AVP 0
+m=audio 60640 RTP/AVP 0 111
 a=rtpmap:0 PCMU/8000
+a=rtpmap:111 OPUS/48000/2
 a=sendrecv";
 
             // Create a local session and add the video track first.
-            RTPSession localSession = new RTPSession(false, false, false);
-            MediaStreamTrack localAudioTrack = new MediaStreamTrack(SDPMediaTypesEnum.audio, false, new List<SDPAudioVideoMediaFormat> { new SDPAudioVideoMediaFormat(SDPWellKnownMediaFormatsEnum.PCMU) });
-            localSession.addTrack(localAudioTrack);
-            MediaStreamTrack localVideoTrack = new MediaStreamTrack(SDPMediaTypesEnum.video, false, new List<SDPAudioVideoMediaFormat> { new SDPAudioVideoMediaFormat(96, "VP8", 90000) });
-            localSession.addTrack(localVideoTrack);
+            RTPSession rtpSession = new RTPSession(false, false, false);
+            MediaStreamTrack localAudioTrack = new MediaStreamTrack(SDPMediaTypesEnum.audio, false, new List<SDPAudioVideoMediaFormat> { 
+                new SDPAudioVideoMediaFormat(SDPWellKnownMediaFormatsEnum.PCMU),
+                new SDPAudioVideoMediaFormat(SDPMediaTypesEnum.audio, 110, "OPUS/48000/2")
+            });
+            rtpSession.addTrack(localAudioTrack);
+            MediaStreamTrack localVideoTrack = new MediaStreamTrack(SDPMediaTypesEnum.video, false, new List<SDPAudioVideoMediaFormat> { new SDPAudioVideoMediaFormat(SDPMediaTypesEnum.video, 96, "VP8", 90000) });
+            rtpSession.addTrack(localVideoTrack);
 
             var offer = SDP.ParseSDPDescription(remoteSdp);
 
             logger.LogDebug($"Remote offer: {offer}");
 
-            var result = localSession.SetRemoteDescription(SIP.App.SdpType.offer, offer);
+            var result = rtpSession.SetRemoteDescription(SIP.App.SdpType.offer, offer);
 
             logger.LogDebug($"Set remote description on local session result {result}.");
 
             Assert.Equal(SetDescriptionResultEnum.OK, result);
 
-            var answer = localSession.CreateAnswer(null);
+            var answer = rtpSession.CreateAnswer(null);
 
             logger.LogDebug($"Local answer: {answer}");
+
+            Assert.Equal(111, rtpSession.AudioLocalTrack.Capabilities.Single(x => x.Name() == "OPUS").ID);
+            Assert.Equal(100, rtpSession.VideoLocalTrack.Capabilities.Single(x => x.Name() == "VP8").ID);
 
             //Assert.True(SDPAudioVideoMediaFormat.AreMatch(offer.Media.Single(x => x.Media == SDPMediaTypesEnum.audio)., answer.Media.First().Media));
             //Assert.Equal(offer.Media.Last().Media, answer.Media.Last().Media);
 
-            localSession.Close("normal");
+            rtpSession.Close("normal");
+        }
+
+        /// <summary>
+        /// Checks that accepting a remote offer works correctly when no media stream attribute is present.
+        /// </summary>
+        [Fact]
+        public void SetRemoteSDPNoMediaStreamAttributeUnitTest()
+        {
+            logger.LogDebug("--> " + System.Reflection.MethodBase.GetCurrentMethod().Name);
+            logger.BeginScope(System.Reflection.MethodBase.GetCurrentMethod().Name);
+
+            string remoteSdp =
+            @"v=0
+o=- 1986548327 0 IN IP4 127.0.0.1
+s=-
+c=IN IP4 127.0.0.1
+t=0 0
+m=audio 60640 RTP/AVP 0 111
+a=rtpmap:0 PCMU/8000
+a=rtpmap:111 OPUS/48000/2";
+
+            // Create a local session with an audio track.
+            RTPSession rtpSession = new RTPSession(false, false, false);
+            MediaStreamTrack localAudioTrack = new MediaStreamTrack(new AudioFormat(SDPWellKnownMediaFormatsEnum.PCMU));
+            rtpSession.addTrack(localAudioTrack);
+
+            var offer = SDP.ParseSDPDescription(remoteSdp);
+
+            logger.LogDebug($"Remote offer: {offer}");
+
+            var result = rtpSession.SetRemoteDescription(SIP.App.SdpType.offer, offer);
+
+            logger.LogDebug($"Set remote description on local session result {result}.");
+
+            Assert.Equal(SetDescriptionResultEnum.OK, result);
+
+            var answer = rtpSession.CreateAnswer(null);
+
+            logger.LogDebug($"Local answer: {answer}");
+
+            Assert.Equal(0, rtpSession.AudioLocalTrack.Capabilities.Single(x => x.Name() == "PCMU").ID);
+            Assert.Equal(MediaStreamStatusEnum.SendRecv, rtpSession.AudioLocalTrack.StreamStatus);
+            Assert.NotNull(rtpSession.AudioRemoteTrack);
+            Assert.Equal(MediaStreamStatusEnum.SendRecv, rtpSession.AudioRemoteTrack.StreamStatus);
+
+            rtpSession.Close("normal");
+        }
+
+        /// <summary>
+        /// Checks that the selected audio format is chosen correctly when setting the remote description.
+        /// </summary>
+        [Fact]
+        public void CheckSelectedAudioForamtAttributeUnitTest()
+        {
+            logger.LogDebug("--> " + System.Reflection.MethodBase.GetCurrentMethod().Name);
+            logger.BeginScope(System.Reflection.MethodBase.GetCurrentMethod().Name);
+
+            string remoteSdp =
+            @"v=0
+o=- 1986548327 0 IN IP4 127.0.0.1
+s=-
+c=IN IP4 127.0.0.1
+t=0 0
+m=audio 60640 RTP/AVP 0 111 8
+a=rtpmap:0 PCMU/8000
+a=rtpmap:111 OPUS/48000/2";
+
+            // Create a local session with an audio track.
+            RTPSession rtpSession = new RTPSession(false, false, false);
+            MediaStreamTrack localAudioTrack = new MediaStreamTrack(SDPWellKnownMediaFormatsEnum.PCMA, SDPWellKnownMediaFormatsEnum.G723);
+            rtpSession.addTrack(localAudioTrack);
+
+            var offer = SDP.ParseSDPDescription(remoteSdp);
+
+            logger.LogDebug($"Remote offer: {offer}");
+
+            var result = rtpSession.SetRemoteDescription(SIP.App.SdpType.offer, offer);
+
+            logger.LogDebug($"Set remote description on local session result {result}.");
+
+            Assert.Equal(SetDescriptionResultEnum.OK, result);
+            Assert.Equal(8, rtpSession.AudioLocalTrack.Capabilities.Single(x => x.Name() == "PCMA").ID);
+            Assert.Equal("PCMA", rtpSession.GetSendingFormat(SDPMediaTypesEnum.audio).Name());
+
+            rtpSession.Close("normal");
+        }
+
+        /// <summary>
+        /// Checks that the selected audio format is chosen correctly when the remote description
+        /// has used a well known ID for a different media type.
+        /// </summary>
+        [Fact]
+        public void ModifiedWellKnownFormatIDUnitTest()
+        {
+            logger.LogDebug("--> " + System.Reflection.MethodBase.GetCurrentMethod().Name);
+            logger.BeginScope(System.Reflection.MethodBase.GetCurrentMethod().Name);
+
+            string remoteSdp =
+            @"v=0
+o=- 1986548327 0 IN IP4 127.0.0.1
+c=IN IP4 127.0.0.1
+m=audio 60640 RTP/AVP 8 12
+a=rtpmap:8 OPUS/48000/2
+a=rtpmap:12 PCMA/8000";
+
+            // Create a local session with an audio track.
+            RTPSession rtpSession = new RTPSession(false, false, false);
+            MediaStreamTrack localAudioTrack = new MediaStreamTrack(
+                SDPWellKnownMediaFormatsEnum.PCMU,
+                SDPWellKnownMediaFormatsEnum.PCMA, 
+                SDPWellKnownMediaFormatsEnum.G722);
+            rtpSession.addTrack(localAudioTrack);
+
+            var offer = SDP.ParseSDPDescription(remoteSdp);
+
+            logger.LogDebug($"Remote offer: {offer}");
+
+            var result = rtpSession.SetRemoteDescription(SIP.App.SdpType.offer, offer);
+
+            logger.LogDebug($"Set remote description on local session result {result}.");
+
+            Assert.Equal(SetDescriptionResultEnum.OK, result);
+            Assert.Equal(12, rtpSession.AudioLocalTrack.Capabilities.Single(x => x.Name() == "PCMA").ID);
+            Assert.Equal("PCMA", rtpSession.GetSendingFormat(SDPMediaTypesEnum.audio).Name());
+
+            var answer = rtpSession.CreateAnswer(null);
+
+            logger.LogDebug($"Local answer: {answer}");
+
+            Assert.Equal(12, answer.Media.Single().MediaFormats.Single().Key);
+            Assert.Equal("PCMA", answer.Media.Single().MediaFormats.Single().Value.Name());
+
+            rtpSession.Close("normal");
         }
     }
 }

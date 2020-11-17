@@ -604,7 +604,7 @@ namespace SIPSorcery.Net
                         }
                         else
                         {
-                            AudioLocalTrack.Capabilities = NegotiateFormats(sdpType, announcement, AudioLocalTrack?.Capabilities);
+                            AudioLocalTrack.Capabilities = SDPAudioVideoMediaFormat.GetCompatibleFormats(announcement.MediaFormats.Values.ToList(), AudioLocalTrack?.Capabilities);
                             remoteAudioRtpEP = GetAnnouncementRTPDestination(announcement, connectionAddress);
 
                             // Check whether RTP events can be supported and adjust our parameters to match the remote party if we can.
@@ -632,7 +632,7 @@ namespace SIPSorcery.Net
                         }
                         else
                         {
-                            VideoLocalTrack.Capabilities = NegotiateFormats(sdpType, announcement, VideoLocalTrack?.Capabilities);
+                            VideoLocalTrack.Capabilities = SDPAudioVideoMediaFormat.GetCompatibleFormats(announcement.MediaFormats.Values.ToList(), VideoLocalTrack?.Capabilities);
                             remoteVideoRtpEP = GetAnnouncementRTPDestination(announcement, connectionAddress);
 
                             SetLocalTrackStreamStatus(VideoLocalTrack, remoteTrack.StreamStatus, remoteVideoRtpEP);
@@ -706,17 +706,6 @@ namespace SIPSorcery.Net
                 VideoLocalTrack.StreamStatus = status;
                 m_sdpAnnouncementVersion++;
             }
-        }
-
-        private List<SDPAudioVideoMediaFormat> NegotiateFormats(
-            SdpType sdpType,
-            SDPMediaAnnouncement announcement,
-            List<SDPAudioVideoMediaFormat> localCapabilities)
-        {
-            // The media formats from the SDP answer take priority.
-            return sdpType == SdpType.answer ?
-                SDPAudioVideoMediaFormat.GetCompatibleFormats(announcement.MediaFormats.Values.ToList(), localCapabilities) :
-                SDPAudioVideoMediaFormat.GetCompatibleFormats(localCapabilities, announcement.MediaFormats.Values.ToList());
         }
 
         private IPEndPoint GetAnnouncementRTPDestination(
@@ -809,6 +798,7 @@ namespace SIPSorcery.Net
                         !AudioLocalTrack.Capabilities.Any(x => x.ID == DTMF_EVENT_PAYLOAD_ID))
                     {
                         SDPAudioVideoMediaFormat rtpEventFormat = new SDPAudioVideoMediaFormat(
+                            SDPMediaTypesEnum.audio,
                             DTMF_EVENT_PAYLOAD_ID,
                             SDP.TELEPHONE_EVENT_ATTRIBUTE,
                             DEFAULT_AUDIO_CLOCK_RATE,
@@ -891,7 +881,7 @@ namespace SIPSorcery.Net
         {
             if (localTrack != null)
             {
-                if (remoteTrackStatus == MediaStreamStatusEnum.Inactive || remoteTrackStatus == MediaStreamStatusEnum.None)
+                if (remoteTrackStatus == MediaStreamStatusEnum.Inactive)
                 {
                     // The remote party does not support this media type. Set the local stream status to inactive.
                     localTrack.StreamStatus = MediaStreamStatusEnum.Inactive;
@@ -2193,7 +2183,11 @@ namespace SIPSorcery.Net
                 return SDPMediaTypesEnum.video;
             }
 
-            logger.LogWarning($"An RTP packet with payload ID {header.PayloadType} was received that could not be matched to an audio or video stream.");
+            if (RemoteDescription != null)
+            {
+                logger.LogWarning($"An RTP packet with payload ID {header.PayloadType} was received that could not be matched to an audio or video stream.");
+            }
+
             return null;
         }
 
