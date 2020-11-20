@@ -179,8 +179,8 @@ namespace SIPSorcery.SIP
                 else
                 {
                     // Change serverUri with certificate domain name to allow ClientWebSocket to verify the certificate. 
-                    // This is done here to allow ConnectionID computation based on IPAddress
-                    if ( !string.IsNullOrWhiteSpace(serverCertificateName) )
+                    // This is not done before to allow ConnectionID computation based on IPAddress
+                    if (serverEndPoint.Protocol == SIPProtocolsEnum.wss && !string.IsNullOrWhiteSpace(serverCertificateName) )
                     {
                         serverUri = new Uri($"{uriPrefix}{serverCertificateName}:{serverEndPoint.Port}");
                     }
@@ -378,7 +378,7 @@ namespace SIPSorcery.SIP
                         Task<WebSocketReceiveResult> receiveTask = receiveTasks[completedTaskIndex];
                         var conn = m_egressConnections.Where(x => x.Value.ReceiveTask.Id == receiveTask.Id).Single().Value;
 
-                        if (receiveTask.IsCompleted)
+                        if (receiveTask.IsCompleted && conn.Client.State != WebSocketState.Aborted && conn.Client.State != WebSocketState.Closed )
                         {
                             logger.LogDebug($"Client web socket connection to {conn.ServerUri} received {receiveTask.Result.Count} bytes.");
                             //SIPMessageReceived(this, conn.LocalEndPoint, conn.RemoteEndPoint, conn.ReceiveBuffer.Take(receiveTask.Result.Count).ToArray()).Wait();
